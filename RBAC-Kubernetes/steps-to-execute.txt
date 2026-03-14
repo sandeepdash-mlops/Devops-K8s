@@ -1,0 +1,12 @@
+# createing a linux user
+
+sudo sh create-linux-user.sh pritam
+
+# Creating a k8 user 
+
+sh create-k8s-user.sh pritam
+
+
+# move-kubeconfig.sh file
+
+sudo sh move-kubeconfig.sh pritam
