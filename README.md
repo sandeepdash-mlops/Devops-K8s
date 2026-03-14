@@ -29,7 +29,7 @@ Managing a **highly available Kubernetes cluster across multiple networks, regio
 ```
                         ┌─────────────────────────────────────────────┐
                         │           HAProxy Load Balancer              │
-                        │         isiem-proxy-host (10.10.1.36)        │
+                        │         stage-proxy-host (10.10.1.36)        │
                         │              Public IP + VPN                 │
                         └──────────────┬──────────────────────────────┘
                                        │ :6443
@@ -116,7 +116,7 @@ systemctl enable --now haproxy.service
 ```bash
 sudo kubeadm init \
   --skip-phases=addon/kube-proxy \
-  --control-plane-endpoint "isiem.proxyhost.lan:6443" \
+  --control-plane-endpoint "stage.proxyhost.lan:6443" \
   --upload-certs
 ```
 
@@ -124,14 +124,14 @@ sudo kubeadm init \
 
 ```bash
 # Control-plane join (cp-2, cp-3)
-kubeadm join isiem.proxyhost.lan:6443 \
+kubeadm join stage.proxyhost.lan:6443 \
   --token <token> \
   --discovery-token-ca-cert-hash <hash> \
   --control-plane \
   --certificate-key <cert-key>
 
 # Worker node join
-kubeadm join isiem.proxyhost.lan:6443 \
+kubeadm join stage.proxyhost.lan:6443 \
   --token <token> \
   --discovery-token-ca-cert-hash <hash>
 ```
@@ -158,7 +158,7 @@ kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisione
 helm install nfs-provisioner nfs-subdir-external-provisioner/nfs-subdir-external-provisioner \
   --set nfs.server=<NFS_SERVER_IP> \
   --set nfs.path=/nas \
-  --set storageClass.name=isiem-storage
+  --set storageClass.name=stage-storage
 ```
 
 > 📖 For complete commands, configs, and troubleshooting — refer to **`hybrid-multi-region-ha-cluster-setup.txt`**
@@ -205,7 +205,7 @@ etcdctl ... member remove <STALE_MEMBER_HEX_ID>
 # Step 3 — On the broken node, clean state and rejoin
 systemctl stop kubelet
 rm -rf /etc/kubernetes /var/lib/etcd /var/lib/kubelet
-kubeadm join isiem.proxyhost.lan:6443 --token <token> \
+kubeadm join stage.proxyhost.lan:6443 --token <token> \
   --discovery-token-ca-cert-hash <hash> \
   --control-plane --certificate-key <cert-key>
 ```
