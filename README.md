@@ -1,6 +1,20 @@
-# 🚀 Devops-K8s — Hybrid Multi-Region HA Kubernetes Cluster
+<div align="center">
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0d1117,50:1a3a2a,100:16a34a&height=220&section=header&text=Devops-K8s&fontSize=90&fontColor=ffffff&fontAlignY=38&desc=Hybrid%20Multi-Region%20HA%20Kubernetes%20Cluster&descAlignY=58&descSize=22&descColor=86efac" alt="Devops-K8s Banner"/>
+
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-1.32-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)](https://kubernetes.io/)
+[![Rocky Linux](https://img.shields.io/badge/Rocky_Linux-9.x-10B981?style=for-the-badge&logo=rockylinux&logoColor=white)](https://rockylinux.org/)
+[![Cilium](https://img.shields.io/badge/Cilium-CNI-F8C517?style=for-the-badge&logo=cilium&logoColor=black)](https://cilium.io/)
+[![Helm](https://img.shields.io/badge/Helm-3-0F1689?style=for-the-badge&logo=helm&logoColor=white)](https://helm.sh/)
+[![HAProxy](https://img.shields.io/badge/HAProxy-Load_Balancer-FF6600?style=for-the-badge)](https://www.haproxy.org/)
+[![etcd](https://img.shields.io/badge/etcd-Quorum-419EDA?style=for-the-badge)](https://etcd.io/)
+[![CRI-O](https://img.shields.io/badge/CRI--O-Runtime-CC0000?style=for-the-badge)](https://cri-o.io/)
+[![NFS](https://img.shields.io/badge/NFS-Persistent_Storage-6B7280?style=for-the-badge)](https://kubernetes.io/docs/concepts/storage/)
+
+<br/>
 
 > **End-to-end automation for a production cross-network HA Kubernetes cluster spanning multiple regions and cloud/on-prem nodes — featuring HAProxy load balancing, etcd quorum management, persistent storage, and RBAC — built for hybrid enterprise infrastructure with security and compliance in mind.**
+
+</div>
 
 ---
 
@@ -51,7 +65,7 @@ Managing a **highly available Kubernetes cluster across multiple networks, regio
 | 📦 **Persistent Storage** | Supports both NFS (`nfs-subdir-external-provisioner`) and local-path provisioner |
 | 🌿 **Cilium CNI** | eBPF-powered networking with kube-proxy replacement, Hubble observability, Gateway API |
 | 🔁 **Full Recovery Playbooks** | Documented + scripted recovery for etcd split-brain and hostname-change failures |
-| 🤖 **End-to-End Automation** | Single `isiem-k8s-setup.sh` script with interactive menu + `--auto` mode for CI/Ansible |
+| 🤖 **End-to-End Automation** | Single `isiem-k8s-setup.sh` with interactive menu + `--auto` mode for CI/Ansible |
 
 ---
 
@@ -59,15 +73,15 @@ Managing a **highly available Kubernetes cluster across multiple networks, regio
 
 ```
 Devops-K8s/
-├── isiem-k8s-setup.sh              # 🔧 Main automation script (all roles)
-├── config.env                      # ⚙️  Configuration file (IPs, tokens, versions)
-├── slave-nodes.sh                  # 👷 Worker node join helper
+├── isiem-k8s-setup.sh                        # 🔧 Main automation script (all roles)
+├── config.env                                # ⚙️  All IPs, tokens, versions — one place
+├── slave-nodes.sh                            # 👷 Worker node join helper
 ├── hybrid-multi-region-ha-cluster-setup.txt  # 📖 Full setup reference guide
 ├── RBAC-Kubernetes/
-│   ├── create-linux-user.sh        # 👤 Create OS-level user on node
-│   ├── create-k8s-user.sh          # 🔑 Create K8s user with cert-based auth
-│   ├── move-kubeconfig.sh          # 📤 Distribute kubeconfig to user
-│   └── steps-to-execute.txt        # 📋 RBAC execution order guide
+│   ├── create-linux-user.sh                  # 👤 Create OS-level user on node
+│   ├── create-k8s-user.sh                    # 🔑 K8s user with cert-based auth + role binding
+│   ├── move-kubeconfig.sh                    # 📤 Distribute kubeconfig to user
+│   └── steps-to-execute.txt                  # 📋 RBAC execution order guide
 └── README.md
 ```
 
@@ -124,7 +138,7 @@ sudo bash isiem-k8s-setup.sh --config my-config.env --auto
 
 ## 🔒 RBAC — Kubernetes User Management
 
-The `RBAC-Kubernetes/` module handles the full lifecycle of granting a developer or operator scoped access to the cluster.
+The `RBAC-Kubernetes/` module handles the full lifecycle of granting a developer or operator scoped cluster access.
 
 ```bash
 # Step 1 — Create Linux user on the node
@@ -137,14 +151,14 @@ bash RBAC-Kubernetes/create-k8s-user.sh <username> <namespace> <role>
 bash RBAC-Kubernetes/move-kubeconfig.sh <username>
 ```
 
-See `RBAC-Kubernetes/steps-to-execute.txt` for the full execution order and examples.
+> See `RBAC-Kubernetes/steps-to-execute.txt` for the full execution order and examples.
 
 ---
 
 ## 🔁 Failure Recovery Playbooks
 
 ### Case 1 — Stale etcd Member (Control-Plane Rejoin)
-When a control-plane is rebuilt or re-provisioned, the old etcd membership blocks the rejoin.
+> When a control-plane is rebuilt or re-provisioned, the old etcd membership blocks the rejoin.
 
 ```bash
 # On a healthy control-plane — remove the stale etcd member
@@ -161,22 +175,9 @@ sudo bash isiem-k8s-setup.sh   # Choose option 8
 
 ### Case 2 — Hostname Changed on Worker Node
 ```bash
-# Update /etc/hosts with new hostname, then:
+# Update /etc/hosts with the new hostname, then:
 sudo bash isiem-k8s-setup.sh   # Choose option 9
 ```
-
----
-
-## 🧰 Tech Stack
-
-![Kubernetes](https://img.shields.io/badge/Kubernetes-1.32-326CE5?style=flat-square&logo=kubernetes&logoColor=white)
-![Rocky Linux](https://img.shields.io/badge/Rocky_Linux-9.x-10B981?style=flat-square&logo=rockylinux&logoColor=white)
-![HAProxy](https://img.shields.io/badge/HAProxy-LB-FF6600?style=flat-square)
-![Cilium](https://img.shields.io/badge/Cilium-CNI-F8C517?style=flat-square&logo=cilium&logoColor=black)
-![CRI-O](https://img.shields.io/badge/CRI--O-Runtime-CC0000?style=flat-square)
-![etcd](https://img.shields.io/badge/etcd-Quorum-419EDA?style=flat-square)
-![Helm](https://img.shields.io/badge/Helm-3-0F1689?style=flat-square&logo=helm&logoColor=white)
-![NFS](https://img.shields.io/badge/NFS-Storage-6B7280?style=flat-square)
 
 ---
 
@@ -186,23 +187,28 @@ sudo bash isiem-k8s-setup.sh   # Choose option 9
 This cluster spans on-prem and cloud nodes — a cloud-native LB can't front all three. HAProxy runs on a dedicated proxy node with VPN access to all control-planes, making it the only viable cross-network solution.
 
 **Why Cilium over flannel/calico?**
-Cilium replaces kube-proxy entirely using eBPF, giving better performance and built-in observability via Hubble — essential for cross-region traffic visibility.
+Cilium replaces kube-proxy entirely using eBPF, delivering better performance and built-in observability via Hubble — essential for cross-region traffic visibility.
 
 **Why CRI-O over containerd/Docker?**
-CRI-O is purpose-built for Kubernetes, lighter weight, and better aligned with OCI standards — reducing attack surface for compliance-sensitive environments.
+CRI-O is purpose-built for Kubernetes, lighter weight, and better aligned with OCI standards — reducing attack surface in compliance-sensitive environments.
 
 ---
 
 ## 💬 Connect
 
-If you found this project helpful or have any questions, feel free to reach out!
+<div align="center">
 
 📧 **Email:** sandeepdashmlops@gmail.com
-
+&nbsp;&nbsp;|&nbsp;&nbsp;
 💻 **GitHub:** [github.com/sandeepdash-mlops](https://github.com/sandeepdash-mlops)
+
+</div>
 
 ---
 
-<p align="center">
-  Built with 🔧 by <a href="https://github.com/sandeepdash-mlops">sandeepdash-mlops</a> — real infrastructure, real problems, real fixes.
-</p>
+<div align="center">
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:16a34a,50:1a3a2a,100:0d1117&height=120&section=footer" alt="footer"/>
+
+*Real infrastructure. Real problems. Real fixes.*
+
+</div>
