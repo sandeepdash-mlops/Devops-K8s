@@ -12,7 +12,7 @@
 
 <br/>
 
-> **End-to-end automation for a production cross-network HA Kubernetes cluster spanning multiple regions and cloud/on-prem nodes — featuring HAProxy load balancing, etcd quorum management, persistent storage, and RBAC — built for hybrid enterprise infrastructure with security and compliance in mind.**
+> **End-to-end production setup for a cross-network HA Kubernetes cluster spanning multiple regions and cloud/on-prem nodes — featuring HAProxy load balancing, etcd quorum management, persistent storage, and RBAC — built for hybrid enterprise infrastructure with security and compliance in mind.**
 
 </div>
 
@@ -20,7 +20,7 @@
 
 ## 📌 What This Project Solves
 
-Managing a **highly available Kubernetes cluster across multiple networks, regions, and cloud providers** is one of the hardest real-world infrastructure challenges. This repo automates the entire lifecycle — from bootstrapping nodes to recovering a broken etcd quorum — with production-grade tooling on **Rocky Linux 9**.
+Managing a **highly available Kubernetes cluster across multiple networks, regions, and cloud providers** is one of the hardest real-world infrastructure challenges. This repo documents and scripts the entire lifecycle — from bootstrapping nodes to recovering a broken etcd quorum — with production-grade tooling on **Rocky Linux 9**.
 
 ---
 
@@ -64,8 +64,8 @@ Managing a **highly available Kubernetes cluster across multiple networks, regio
 | 🔒 **RBAC Automation** | Scripts for Linux user creation, Kubernetes user binding, and kubeconfig distribution |
 | 📦 **Persistent Storage** | Supports both NFS (`nfs-subdir-external-provisioner`) and local-path provisioner |
 | 🌿 **Cilium CNI** | eBPF-powered networking with kube-proxy replacement, Hubble observability, Gateway API |
-| 🔁 **Full Recovery Playbooks** | Documented + scripted recovery for etcd split-brain and hostname-change failures |
-| 🤖 **End-to-End Automation** | Single `isiem-k8s-setup.sh` with interactive menu + `--auto` mode for CI/Ansible |
+| 🔁 **Full Recovery Playbooks** | Step-by-step recovery for etcd split-brain and hostname-change failures |
+| 📖 **Production Reference Guide** | Complete manual setup guide with real commands, real errors, and real fixes |
 
 ---
 
@@ -73,10 +73,8 @@ Managing a **highly available Kubernetes cluster across multiple networks, regio
 
 ```
 Devops-K8s/
-├── isiem-k8s-setup.sh                        # 🔧 Main automation script (all roles)
-├── config.env                                # ⚙️  All IPs, tokens, versions — one place
-├── slave-nodes.sh                            # 👷 Worker node join helper
-├── hybrid-multi-region-ha-cluster-setup.txt  # 📖 Full setup reference guide
+├── hybrid-multi-region-ha-cluster-setup.txt  # 📖 Complete manual setup reference guide
+├── slave-nodes.sh                            # 👷 Worker node join helper script
 ├── RBAC-Kubernetes/
 │   ├── create-linux-user.sh                  # 👤 Create OS-level user on node
 │   ├── create-k8s-user.sh                    # 🔑 K8s user with cert-based auth + role binding
@@ -87,52 +85,83 @@ Devops-K8s/
 
 ---
 
-## ⚡ Quick Start
+## 🛠️ Setup Guide
 
-### Prerequisites
-- Rocky Linux 9.x on all nodes
-- VPN connectivity between all nodes (cross-network)
-- Root/sudo access
-- HAProxy node reachable from all control-planes and workers
+The full step-by-step manual setup is documented in **`hybrid-multi-region-ha-cluster-setup.txt`**.
 
-### 1. Clone & Configure
+Below is a high-level summary of the setup phases:
+
+### Phase 1 — HAProxy Node
 
 ```bash
-git clone https://github.com/sandeepdash-mlops/Devops-K8s.git
-cd Devops-K8s
-cp config.env my-config.env
-vim my-config.env   # Fill in your IPs, hostnames, tokens
+dnf install haproxy -y
+# Configure /etc/haproxy/haproxy.cfg with all 3 control-plane backends
+# Add local DNS entry in /etc/hosts pointing to HAProxy internal IP
+haproxy -c -V -f /etc/haproxy/haproxy.cfg     # validate config
+systemctl enable --now haproxy.service
 ```
 
-### 2. Run Setup (Interactive)
-
-```bash
-sudo bash isiem-k8s-setup.sh --config my-config.env
-```
-
-```
-══════════════════════════════════════
-  ISIEM HA Kubernetes Setup
-══════════════════════════════════════
-  Select an action:
-   1) Setup HAProxy Load Balancer
-   2) Prepare node (common prerequisites)
-   3) Initialize FIRST control-plane
-   4) Join additional control-plane
-   5) Join worker node
-   6) Install Cilium CNI
-   7) Setup Storage (local-path or NFS)
-   8) Recovery: Remove stale etcd member & rejoin control-plane
-   9) Recovery: Reset & rejoin worker node
-   0) Exit
-```
-
-### 3. Non-Interactive (CI / Ansible)
+### Phase 2 — All Nodes (Prerequisites)
 
 ```bash
-# Set NODE_ROLE in config.env, then:
-sudo bash isiem-k8s-setup.sh --config my-config.env --auto
+# Set hostname, /etc/hosts, disable swap, SELinux permissive
+# Load kernel modules: overlay, br_netfilter
+# Apply sysctl params for bridged traffic
+# Install CRI-O container runtime
+# Install kubelet, kubeadm, kubectl
 ```
+
+### Phase 3 — Initialize First Control-Plane
+
+```bash
+sudo kubeadm init \
+  --skip-phases=addon/kube-proxy \
+  --control-plane-endpoint "isiem.proxyhost.lan:6443" \
+  --upload-certs
+```
+
+### Phase 4 — Join Additional Control-Planes & Workers
+
+```bash
+# Control-plane join (cp-2, cp-3)
+kubeadm join isiem.proxyhost.lan:6443 \
+  --token <token> \
+  --discovery-token-ca-cert-hash <hash> \
+  --control-plane \
+  --certificate-key <cert-key>
+
+# Worker node join
+kubeadm join isiem.proxyhost.lan:6443 \
+  --token <token> \
+  --discovery-token-ca-cert-hash <hash>
+```
+
+### Phase 5 — Cilium CNI
+
+```bash
+helm repo add cilium https://helm.cilium.io/
+helm install cilium cilium/cilium --version 1.18.5 \
+  --namespace kube-system \
+  --set kubeProxyReplacement=true \
+  --set k8sServiceHost=<CONTROL_PLANE_IP> \
+  --set k8sServicePort=6443 \
+  --set hubble.relay.enabled=true
+```
+
+### Phase 6 — Persistent Storage
+
+```bash
+# Local path provisioner
+kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
+
+# OR NFS provisioner via Helm
+helm install nfs-provisioner nfs-subdir-external-provisioner/nfs-subdir-external-provisioner \
+  --set nfs.server=<NFS_SERVER_IP> \
+  --set nfs.path=/nas \
+  --set storageClass.name=isiem-storage
+```
+
+> 📖 For complete commands, configs, and troubleshooting — refer to **`hybrid-multi-region-ha-cluster-setup.txt`**
 
 ---
 
@@ -158,25 +187,44 @@ bash RBAC-Kubernetes/move-kubeconfig.sh <username>
 ## 🔁 Failure Recovery Playbooks
 
 ### Case 1 — Stale etcd Member (Control-Plane Rejoin)
-> When a control-plane is rebuilt or re-provisioned, the old etcd membership blocks the rejoin.
+
+> When a control-plane is rebuilt or re-provisioned, the old etcd membership blocks the rejoin with `error: etcd cluster is not healthy`.
 
 ```bash
-# On a healthy control-plane — remove the stale etcd member
+# Step 1 — On a healthy CP, list etcd members
 kubectl -n kube-system exec -it etcd-<healthy-cp> -- \
   etcdctl --endpoints=https://127.0.0.1:2379 \
   --cacert=/etc/kubernetes/pki/etcd/ca.crt \
   --cert=/etc/kubernetes/pki/etcd/healthcheck-client.crt \
   --key=/etc/kubernetes/pki/etcd/healthcheck-client.key \
-  member remove <STALE_MEMBER_ID>
+  member list
 
-# Then on the broken node — clean state and rejoin
-sudo bash isiem-k8s-setup.sh   # Choose option 8
+# Step 2 — Remove the stale member using its hex ID
+etcdctl ... member remove <STALE_MEMBER_HEX_ID>
+
+# Step 3 — On the broken node, clean state and rejoin
+systemctl stop kubelet
+rm -rf /etc/kubernetes /var/lib/etcd /var/lib/kubelet
+kubeadm join isiem.proxyhost.lan:6443 --token <token> \
+  --discovery-token-ca-cert-hash <hash> \
+  --control-plane --certificate-key <cert-key>
 ```
 
 ### Case 2 — Hostname Changed on Worker Node
+
+> Kubelet fails with `node "old-name" not found` after a hostname change.
+
 ```bash
-# Update /etc/hosts with the new hostname, then:
-sudo bash isiem-k8s-setup.sh   # Choose option 9
+# Stop services and clean state
+systemctl stop kubelet && systemctl stop crio
+rm -rf /etc/kubernetes /var/lib/etcd /var/lib/kubelet
+
+# Update /etc/hosts with the new hostname
+# Generate a fresh join token from any healthy CP
+kubeadm token create --print-join-command
+
+# Rejoin with the new hostname
+bash slave-nodes.sh
 ```
 
 ---
